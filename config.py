@@ -18,7 +18,7 @@ class Config:
     JWT_ACCESS_LIFESPAN = {"hours": 24}
     JWT_REFRESH_LIFESPAN = {"days": 30}
     # default rate limits on routes
-    RATELIMIT_DEFAULT = ['100 per minute']
+    RATELIMIT_DEFAULT = '100 per minute'
 
 
     @staticmethod
