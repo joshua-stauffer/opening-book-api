@@ -93,3 +93,35 @@ def play():
         abort(404, 'invalid move id')
     
     return Move.get_next_moves(last_move_id, score)
+
+
+@api.route('/study', methods=['POST'])
+@auth_required
+def study():
+    """
+    expects a json with the following keys:
+    color: 'white' or 'black'
+    last_move_id: id of last move (if any)
+    score: int between 0-5 (inclusive)
+        represents supermemo2 score to associate with last move
+
+    returns a json with keys move and next
+    """
+    user_id = current_user().id
+    r = request.get_json()
+    if r:
+        color = r.get('color', None)
+        last_move_id = int(r.get('last_move_id', 0))
+        score = r.get('score', None)
+    else: 
+        color = None
+        score = None
+        last_move_id = 0
+    if score:
+        score = int(score)
+
+    # add SMTwo score for the last request, if provided
+    if last_move_id > 0 and score:
+        Move.add_study_session(last_move_id, score)
+
+    return Move.get_move_by_next_review(user_id, color)

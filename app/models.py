@@ -1,13 +1,17 @@
 from datetime import datetime
+from random import choice
 from supermemo2 import SMTwo
 from . import db, guard
-from .utils.sort_funcs import average_descendent_easiness
+from .utils.sort_funcs import average_descendent_easiness, sort_by_date
 
 # various useful variables
 # a blank board
-fresh_board_fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+STARTING_POSITION_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+FIRST_MOVE = {'id': '', 'fen': STARTING_POSITION_FEN, 'san': ''}
+COLOR_CHOICES = ['w', 'b', 'black', 'white']
+
 # error messages
-no_moves_error = {'message': 'No moves to display'}
+no_moves_error = {'error_message': 'No moves to display'}
 
 
 class User(db.Model):
@@ -60,6 +64,8 @@ class Move(db.Model):
                     backref=db.backref('parent', remote_side=[id]))
     san = db.Column(db.String(8))
     perspective = db.Column(db.String(1)) # w or b
+    # is this a move i'm trying to memorize, or a possible opponent response?
+    book_move = db.Column(db.Boolean)
 
     # supermemo two values
     # init as None, and will be updated on first study
@@ -77,10 +83,15 @@ class Move(db.Model):
         interval {self.interval}
         """
 
+    @classmethod
+    def add_study_session(cls, move_id, quality):
+        """update SMTwo stats for a move"""
+        move = cls.query.filter_by(id=move_id).first()
+        move._add_study_session(quality)
 
-    def add_study_session(self, quality):
+    def _add_study_session(self, quality):
         """
-        updates database values related to supermemo two
+        internal function to updates database values related to supermemo two
 
         params:
             quality: int between 0 and 5 (inclusive)
@@ -123,7 +134,7 @@ class Move(db.Model):
         """
         last_move = cls.query.filter_by(id=move_id).first()
         if score:
-            last_move.add_study_session(score)
+            last_move._add_study_session(score)
         possible_moves = last_move.children
         print(f'possible moves are {possible_moves}')
         possible_moves.sort(key=average_descendent_easiness)
@@ -148,7 +159,7 @@ class Move(db.Model):
             print(f'no moves: {moves}')
             return no_moves_error
         return {
-            'move': {'id': '', 'fen': fresh_board_fen, 'san': ''},
+            'move': FIRST_MOVE,
             'next': [m.to_json() for m in moves]
         }
 
@@ -166,7 +177,37 @@ class Move(db.Model):
         return {
             'move': white_moves[0].to_json(),
             'next': [m.to_json() for m in white_moves[0].children]
-        }    
+        }
+    
+    @classmethod
+    def get_move_by_next_review(cls, user_id, color):
+        #TODO: remove filter by color if user hasn't provided color
+        """get the next book move to be reviewed"""
+        # validate color
+        if color not in COLOR_CHOICES:
+            color = choice(COLOR_CHOICES)
+        # get all book moves for this user
+        all_moves = cls.query \
+                        .filter_by(user_id=user_id) \
+                        .filter_by(book_move=True) \
+                        .all()
+        # find all moves where the opposite color is to move
+        moves = [m for m in all_moves if color[0] != m.fen.split()[1]]
+        if not moves:
+            return no_moves_error
+        # get the move due for review soonest
+        moves.sort(key=sort_by_date)
+        goal_move = moves[0]
+        move = cls.query.filter_by(id=goal_move.parent_id).first()
+        if not move:
+            move = FIRST_MOVE
+            children = cls.query.filter_by(parent_id=None).all()
+            return {'move': move, 'next': [m.to_json() for m in children]}
+        return {
+            'move': move.to_json(),
+            'next': [m.to_json() for m in move.children]
+        }
+        
 
     @classmethod
     def create_move(cls, user_id, parent_id, fen, san, perspective):

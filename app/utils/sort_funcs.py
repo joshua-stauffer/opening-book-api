@@ -1,3 +1,5 @@
+from datetime import datetime
+
 def average_descendent_easiness(move):
     """Get the average easiness of children of move object
     args:
@@ -9,3 +11,9 @@ def average_descendent_easiness(move):
         return 10
     return sum(m.easiness for m in move.children if m.easiness != None) \
                 / len(move.children)
+
+def sort_by_date(move):
+    """Returns move.next_review, unless None, then returns datetime.now()"""
+    if not move.next_review:
+        return datetime.now()
+    return move.next_review
