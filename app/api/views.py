@@ -75,7 +75,7 @@ def play():
     r = request.get_json(force=True)
     color = r.get('color', None)
     if not color:
-        abort(404, 'Missing argument color')
+        abort(400, 'Missing argument color')
     first_move = bool(r.get('first_move', None))
     last_move_id = int(r.get('last_move_id', 0))
     score = r.get('score', None)
@@ -90,7 +90,7 @@ def play():
 
     # check for valid move id
     if not last_move_id > 0:
-        abort(404, 'invalid move id')
+        abort(400, 'invalid move id')
     
     return Move.get_next_moves(last_move_id, score)
 
@@ -125,3 +125,31 @@ def study():
         Move.add_study_session(last_move_id, score)
 
     return Move.get_move_by_next_review(user_id, color)
+
+
+@api.route('/explore', methods=['GET'])
+@auth_required
+def explore():
+    """Returns all moves for a given position
+    expects to be passed a json with either of the following keys:
+    color: 'w' || 'b'
+        starts from beginning of user's database from given color's perspective
+    last_move_id: int
+        gives all the database moves following from given move
+    """
+    user_id = current_user().id
+    r = request.get_json(force=True)
+
+    color = r.get('color', None)
+    last_move_id = int(r.get('last_move_id', 0))
+    if not color and not last_move_id:
+        print(f'missing something: {color} {last_move_id}')
+        abort(400, 'missing color or last_move_id parameters')
+
+    #NOTE: these are lists, so must be jsonified
+    if last_move_id:
+        response = Move.get_descendent_moves(last_move_id)
+    else:
+        response = Move.get_book_start(user_id, color)
+    return jsonify(response)
+    

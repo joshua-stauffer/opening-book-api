@@ -3,15 +3,12 @@ from random import choice
 from supermemo2 import SMTwo
 from . import db, guard
 from .utils.sort_funcs import average_descendent_easiness, sort_by_date
-
-# various useful variables
-# a blank board
-STARTING_POSITION_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-FIRST_MOVE = {'id': '', 'fen': STARTING_POSITION_FEN, 'san': ''}
-COLOR_CHOICES = ['w', 'b', 'black', 'white']
-
-# error messages
-no_moves_error = {'error_message': 'No moves to display'}
+from .utils.constants import (
+    NO_MOVES_ERROR,
+    STARTING_POSITION_FEN,
+    FIRST_MOVE,
+    COLOR_CHOICES
+)
 
 
 class User(db.Model):
@@ -67,6 +64,7 @@ class Move(db.Model):
     # is this a move i'm trying to memorize, or a possible opponent response?
     book_move = db.Column(db.Boolean)
 
+
     # supermemo two values
     # init as None, and will be updated on first study
     last_review = db.Column(db.DateTime, nullable=True)
@@ -74,6 +72,8 @@ class Move(db.Model):
     repetitions = db.Column(db.Integer, nullable=True)
     easiness = db.Column(db.Float, nullable=True)
     interval = db.Column(db.Integer, nullable=True)
+
+    # supermemo two methods
     @property
     def sm2(self):
         return f"""last review: {self.last_review}
@@ -118,6 +118,8 @@ class Move(db.Model):
         db.session.add(self)
         db.session.commit()
 
+
+    # util methods
     def to_json(self):
         """returns dict with keys id, fen, and san"""
         return {
@@ -127,6 +129,29 @@ class Move(db.Model):
         }
 
 
+    # explore methods
+    @classmethod
+    def get_descendent_moves(cls, move_id):
+        """given a move id returns all children"""
+        move = cls.query.filter_by(id=move_id).first()
+        descendents = [m.to_json() for m in move.children]
+        if not descendents:
+            return NO_MOVES_ERROR
+        return descendents
+
+    @classmethod
+    def get_book_start(cls, user_id, color):
+        moves = cls.query \
+                    .filter_by(user_id=user_id) \
+                    .filter_by(perspective=color[0]) \
+                    .filter_by(parent_id=None) \
+                    .all()
+        if not moves:
+            return NO_MOVES_ERROR
+        return [m.to_json() for m in moves]
+
+
+    # play methods
     @classmethod
     def get_next_moves(cls, move_id, score):
         """updates last move score and
@@ -140,7 +165,7 @@ class Move(db.Model):
         possible_moves.sort(key=average_descendent_easiness)
         move = possible_moves[0]
         if not move:
-            return no_moves_error
+            return NO_MOVES_ERROR
         next_moves = move.children
         return {
             'move': move.to_json(),
@@ -157,7 +182,7 @@ class Move(db.Model):
                 .all()
         if not moves:
             print(f'no moves: {moves}')
-            return no_moves_error
+            return NO_MOVES_ERROR
         return {
             'move': FIRST_MOVE,
             'next': [m.to_json() for m in moves]
@@ -173,28 +198,31 @@ class Move(db.Model):
                     .all()
         white_moves.sort(key=average_descendent_easiness, reverse=True)
         if not white_moves:
-            return no_moves_error
+            return NO_MOVES_ERROR
         return {
             'move': white_moves[0].to_json(),
             'next': [m.to_json() for m in white_moves[0].children]
         }
     
+
+    # study methods
     @classmethod
     def get_move_by_next_review(cls, user_id, color):
-        #TODO: remove filter by color if user hasn't provided color
         """get the next book move to be reviewed"""
-        # validate color
-        if color not in COLOR_CHOICES:
-            color = choice(COLOR_CHOICES)
+
         # get all book moves for this user
-        all_moves = cls.query \
+        moves = cls.query \
                         .filter_by(user_id=user_id) \
                         .filter_by(book_move=True) \
                         .all()
-        # find all moves where the opposite color is to move
-        moves = [m for m in all_moves if color[0] != m.fen.split()[1]]
+
+        # if color, find all moves where the opposite color is to move
+        if color in COLOR_CHOICES:
+            color = choice(COLOR_CHOICES)
+            moves = [m for m in moves if color[0] != m.fen.split()[1]]
         if not moves:
-            return no_moves_error
+            return NO_MOVES_ERROR
+
         # get the move due for review soonest
         moves.sort(key=sort_by_date)
         goal_move = moves[0]
@@ -208,6 +236,7 @@ class Move(db.Model):
             'next': [m.to_json() for m in move.children]
         }
         
+
 
     @classmethod
     def create_move(cls, user_id, parent_id, fen, san, perspective):
