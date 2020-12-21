@@ -43,7 +43,7 @@ def add_move():
         for i, arg in enumerate(args):
             if arg == None:
                 error_list.append(required_args_names[i])
-        abort(404, f'Missing value {", ".join(error_list)} in POST json')
+        abort(400, f'Missing value {", ".join(error_list)} in POST json')
     user_id = current_user().id
     new_move_id = Move.create_move(
         user_id,
@@ -74,8 +74,7 @@ def play():
     user_id = current_user().id
     r = request.get_json(force=True)
     color = r.get('color', None)
-    if not color:
-        abort(400, 'Missing argument color')
+
     first_move = bool(r.get('first_move', None))
     last_move_id = int(r.get('last_move_id', 0))
     score = r.get('score', None)
@@ -83,6 +82,8 @@ def play():
         score = int(score)
 
     if first_move:
+        if not color:
+            abort(400, 'Missing argument color')
         if color == 'white':
             return Move.get_whites_first_book_moves(user_id)
         elif color == 'black':
@@ -108,26 +109,28 @@ def study():
     returns a json with keys move and next
     """
     user_id = current_user().id
-    r = request.get_json()
-    if r:
-        color = r.get('color', None)
-        last_move_id = int(r.get('last_move_id', 0))
-        score = r.get('score', None)
-    else: 
-        color = None
-        score = None
-        last_move_id = 0
-    if score:
-        score = int(score)
+    r = request.get_json(force=True)
 
-    # add SMTwo score for the last request, if provided
-    if last_move_id > 0 and score:
-        Move.add_study_session(last_move_id, score)
-
-    return Move.get_move_by_next_review(user_id, color)
+    #color = r.get('color', None)
+    last_move_id = r.get('last_move_id', [])
+    print('got last move id ', last_move_id)
+    score = r.get('score', -1)
 
 
-@api.route('/explore', methods=['GET'])
+    # check for a list of moves to update SMTwo score
+    if len(last_move_id) and score >= 0:
+        print(f'got a list of length {len(last_move_id)}')
+        for move_id in last_move_id:
+            Move.add_study_session(move_id, score)
+            print(f"just added score {score} for move {move_id}")
+    else:
+        print(f"couldn't use {last_move_id} or {score}")
+    return Move.get_move_by_next_review(user_id)
+
+    
+
+
+@api.route('/explore', methods=['POST'])
 @auth_required
 def explore():
     """Returns all moves for a given position
@@ -137,6 +140,7 @@ def explore():
     last_move_id: int
         gives all the database moves following from given move
     """
+    print('entering explore')
     user_id = current_user().id
     r = request.get_json(force=True)
 
@@ -148,8 +152,10 @@ def explore():
 
     #NOTE: these are lists, so must be jsonified
     if last_move_id:
+        print('getting response in Explore view based on move id')
         response = Move.get_descendent_moves(last_move_id)
     else:
+        print(f'getting response in Explore view based on color {color}')
         response = Move.get_book_start(user_id, color)
     return jsonify(response)
     

@@ -141,6 +141,7 @@ class Move(db.Model):
 
     @classmethod
     def get_book_start(cls, user_id, color):
+        print(f'getting start of book for color {color} by searching for {color[0]}')
         moves = cls.query \
                     .filter_by(user_id=user_id) \
                     .filter_by(perspective=color[0]) \
@@ -207,7 +208,7 @@ class Move(db.Model):
 
     # study methods
     @classmethod
-    def get_move_by_next_review(cls, user_id, color):
+    def get_move_by_next_review(cls, user_id):
         """get the next book move to be reviewed"""
 
         # get all book moves for this user
@@ -215,16 +216,19 @@ class Move(db.Model):
                         .filter_by(user_id=user_id) \
                         .filter_by(book_move=True) \
                         .all()
-
+        """
         # if color, find all moves where the opposite color is to move
         if color in COLOR_CHOICES:
             color = choice(COLOR_CHOICES)
             moves = [m for m in moves if color[0] != m.fen.split()[1]]
+
+        """
         if not moves:
             return NO_MOVES_ERROR
 
         # get the move due for review soonest
         moves.sort(key=sort_by_date)
+        print(f'there are {moves} moves available')
         goal_move = moves[0]
         move = cls.query.filter_by(id=goal_move.parent_id).first()
         if not move:
@@ -240,12 +244,20 @@ class Move(db.Model):
 
     @classmethod
     def create_move(cls, user_id, parent_id, fen, san, perspective):
+
+        # is it our move? then it's a book move, else not
+        if fen.split(' ')[1] != perspective:
+            book_move = True
+        else:
+            book_move = False
+
         new_move = cls(
             user_id=user_id,
             parent_id=parent_id,
             fen=fen,
             san=san,
-            perspective=perspective
+            perspective=perspective[0],
+            book_move=book_move
         )
         db.session.add(new_move)
         db.session.commit()
