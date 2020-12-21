@@ -81,6 +81,8 @@ def play():
     if score:
         score = int(score)
 
+    print(f'Got a request to play: first move: {first_move} color: {color} last move id: {last_move_id} score: {score}')
+
     if first_move:
         if not color:
             abort(400, 'Missing argument color')

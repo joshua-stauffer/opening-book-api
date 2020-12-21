@@ -109,7 +109,11 @@ class Move(db.Model):
                 #last review defaults to now
             )
         sm_two.new_sm_two()
-        self.interval = sm_two.new_interval
+        # seems like a hack, but have to avoid interval getting too large
+        if sm_two.new_interval > 365:
+            self.interval = 365
+        else:
+            self.interval = sm_two.new_interval
         self.easiness = sm_two.new_easiness
         self.repetitions = sm_two.new_repetitions
         self.next_review = datetime.strptime(sm_two.next_review, '%Y-%m-%d')
@@ -164,8 +168,10 @@ class Move(db.Model):
         possible_moves = last_move.children
         print(f'possible moves are {possible_moves}')
         possible_moves.sort(key=average_descendent_easiness)
-        move = possible_moves[0]
-        if not move:
+        
+        if len(possible_moves):
+            move = possible_moves[0]
+        else:
             return NO_MOVES_ERROR
         next_moves = move.children
         return {
