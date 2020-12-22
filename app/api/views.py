@@ -57,6 +57,20 @@ def add_move():
 
     #return {'message': f'protected endpoint (allowed user {current_user().username})'}
 
+
+@api.route('/del-move', methods=['POST'])
+@auth_required
+def del_move():
+    r = request.get_json(force=True)
+    move_id = r.get('move_id', None)
+    if not move_id:
+        abort(400)
+    user_id = current_user().id
+
+    Move.delete_move(user_id, move_id)
+    return {'message': 'success'}, 200
+
+
 @api.route('/play', methods=['POST'])
 @auth_required
 def play():

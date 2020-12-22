@@ -268,3 +268,16 @@ class Move(db.Model):
         db.session.add(new_move)
         db.session.commit()
         return new_move.id
+
+    @classmethod
+    def delete_move(cls, user_id, move_id):
+        move = cls.query.filter_by(id=move_id).first()
+        if not move:
+            raise Exception("Move not found")
+        if not move.user.id == user_id:
+            raise Exception("User id doesnt match move\'s user id")
+        if move.children:
+            raise Exception("Can't delete a move with descendents")
+        print(f'deleting move {move.san}')
+        db.session.delete(move)
+        db.session.commit()
