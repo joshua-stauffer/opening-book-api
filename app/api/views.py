@@ -90,12 +90,12 @@ def play():
     color = r.get('color', None)
 
     first_move = bool(r.get('first_move', None))
-    last_move_id = int(r.get('last_move_id', 0))
+    last_move_list = r.get('last_move_id', [])
     score = r.get('score', None)
     if score:
         score = int(score)
 
-    print(f'Got a request to play: first move: {first_move} color: {color} last move id: {last_move_id} score: {score}')
+    print(f'Got a request to play: first move: {first_move} color: {color} last move id: {last_move_list} score: {score}')
 
     if first_move:
         if not color:
@@ -105,10 +105,17 @@ def play():
         elif color == 'black':
             return Move.get_blacks_first_book_move(user_id)
 
+    # did player miss a move with a list of options? set them all to 0
+    if len(last_move_list) > 1:
+        for move_id in last_move_list:
+            Move.add_study_session(move_id, score)
+    # now take first value and call it a day
+    last_move_id = last_move_list[0]
+
     # check for valid move id
     if not last_move_id > 0:
         abort(400, 'invalid move id')
-    
+    #TODO:  in case of fail, this is currently adding the score twice
     return Move.get_next_moves(last_move_id, score)
 
 
@@ -126,6 +133,7 @@ def study():
     """
     user_id = current_user().id
     r = request.get_json(force=True)
+    print('got a request to STUDY with the following args: ', r)
 
     #color = r.get('color', None)
     last_move_id = r.get('last_move_id', [])
@@ -151,7 +159,7 @@ def study():
 def explore():
     """Returns all moves for a given position
     expects to be passed a json with either of the following keys:
-    color: 'w' || 'b'
+    color: 'w' or 'b'
         starts from beginning of user's database from given color's perspective
     last_move_id: int
         gives all the database moves following from given move

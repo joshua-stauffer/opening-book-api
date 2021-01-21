@@ -235,7 +235,10 @@ class Move(db.Model):
         # get the move due for review soonest
         moves.sort(key=sort_by_date)
         print(f'there are {moves} moves available')
-        goal_move = moves[0]
+        # making this random for now
+        # first filter out any moves without children
+        moves = [m for m in moves if m.children]
+        goal_move = choice(moves)
         move = cls.query.filter_by(id=goal_move.parent_id).first()
         if not move:
             move = FIRST_MOVE
