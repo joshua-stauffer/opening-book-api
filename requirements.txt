@@ -12,7 +12,7 @@ Flask-Mail==0.9.1
 Flask-Migrate==2.5.3
 flask-praetorian==1.1.0
 Flask-SQLAlchemy==2.4.4
-httpie==2.3.0
+httpie==3.1.0
 httpie-jwt-auth==0.4.0
 idna==2.10
 inflection==0.3.1
