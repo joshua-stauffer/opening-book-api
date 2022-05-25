@@ -25,7 +25,7 @@ passlib==1.7.4
 pendulum==2.1.2
 py-buzz==1.0.3
 Pygments==2.7.3
-PyJWT==1.7.1
+PyJWT==2.4.0
 PySocks==1.7.1
 python-dateutil==2.8.1
 python-dotenv==0.15.0
